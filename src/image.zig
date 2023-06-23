@@ -10,6 +10,8 @@ pub const Channels = enum(c_int) {
     rgb_alpha = 4,
 };
 
+const root = @This();
+
 pub const Image = struct {
     data: [*]u8,
     width: c_int,
@@ -21,6 +23,27 @@ pub const Image = struct {
     pub fn free(self: *Image) void {
         stbi_image_free(@ptrCast(*anyopaque, self.data));
         self.data = undefined;
+    }
+
+    pub fn load_from_memory(buffer: []const u8, desired_channels: Channels) !Image {
+        var img: Image = undefined;
+        img.data = try root.load_from_memory(buffer, &img.width, &img.height, &img.channels_in_input, desired_channels);
+        img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
+        return img;
+    }
+
+    pub fn load_from_callbacks(callback: *const stbi_io_callbacks, user_data: ?*anyopaque, desired_channels: Channels) !Image {
+        var img: Image = undefined;
+        img.data = try root.load_from_callbacks(callback, user_data, &img.width, &img.height, &img.channels_in_input, desired_channels);
+        img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
+        return img;
+    }
+
+    pub fn load(filename: [:0]const u8, desired_channels: Channels) !Image {
+        var img: Image = undefined;
+        img.data = try root.load(filename, &img.width, &img.height, &img.channels_in_input, desired_channels);
+        img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
+        return img;
     }
 };
 
@@ -66,20 +89,6 @@ pub fn load_from_memory(buffer: []const u8, width: *c_int, height: *c_int, chann
         @enumToInt(desired_channels),
     ) orelse error.STB_ImageFailure;
 }
-// @Todo: figure out if I'm gonna use this API style (spoiler: I probably will)
-// @Todo: Should this allocate an Image and return it instead?
-pub fn img_load_from_memory(buffer: []const u8, img: *Image, desired_channels: Channels) !void {
-    const data = try load_from_memory(
-        buffer,
-        &img.width,
-        &img.height,
-        &img.channels_in_input,
-        desired_channels,
-    );
-
-    img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
-    img.data = data;
-}
 
 pub extern fn stbi_load_from_callbacks(clbk: *const stbi_io_callbacks, user: ?*anyopaque, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
 
@@ -92,20 +101,6 @@ pub fn load_from_callbacks(callback: *const stbi_io_callbacks, user_data: ?*anyo
         @ptrCast(*c_int, channels_in_file),
         @enumToInt(desired_channels),
     ) orelse error.STB_ImageFailure;
-}
-
-pub fn img_load_from_callbacks(callback: *const stbi_io_callbacks, user_data: ?*anyopaque, img: *Image, desired_channels: Channels) !void {
-    const data = try load_from_callbacks(
-        callback,
-        user_data,
-        &img.width,
-        &img.height,
-        &img.channels_in_input,
-        desired_channels,
-    );
-
-    img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
-    img.data = data;
 }
 
 // #ifndef STBI_NO_STDIO
@@ -121,21 +116,8 @@ pub fn load(filename: [:0]const u8, width: *c_int, height: *c_int, channels_in_f
     ) orelse error.STB_ImageFailure;
 }
 
-pub fn img_load(filename: [:0]const u8, img: *Image, desired_channels: Channels) !void {
-    const data = try load(
-        filename,
-        &img.width,
-        &img.height,
-        &img.channels_in_input,
-        desired_channels,
-    );
-
-    img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
-    img.data = data;
-}
-
 /// File pointer is left pointing immediately after image.
-pub fn load_from_cfile(file: *std.c.FILE, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) [*]u8 {
+pub fn load_from_file(file: *std.c.FILE, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) [*]u8 {
     _ = desired_channels;
     _ = channels_in_file;
     _ = height;
@@ -166,8 +148,7 @@ test "load_from_memory" {
     }
 
     {
-        var img: Image = undefined;
-        try img_load_from_memory(test_image, &img, .rgb);
+        var img = try Image.load_from_memory(test_image, .rgb);
         defer img.free();
         try run_img_test(img);
     }
@@ -281,8 +262,7 @@ test "load_from_callbacks" {
         var stream = Stream{ .index = 0, .data = @embedFile("test.png") };
         // var stream = TestStream.init(@embedFile("test.png"));
 
-        var img: Image = undefined;
-        try img_load_from_callbacks(&callback, &stream, &img, .rgb);
+        var img = try Image.load_from_callbacks(&callback, &stream, .rgb);
         defer img.free();
 
         try run_img_test(img);
@@ -302,8 +282,7 @@ test "load" {
     }
 
     {
-        var img: Image = undefined;
-        try img_load("src/test.png", &img, .rgb);
+        var img = try Image.load("src/test.png", .rgb);
         defer img.free();
         try run_img_test(img);
     }
