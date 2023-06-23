@@ -82,22 +82,21 @@ pub extern fn stbi_image_free(retval_from_stbi_load: ?*anyopaque) void;
 // 8-bits-per-channel interface
 //
 
-pub extern fn stbi_load_from_memory(buffer: [*]const u8, len: c_int, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+pub extern fn stbi_load_from_memory(buffer: [*]const u8, len: c_int, x: *c_int, y: *c_int, channels_in_file: *Channels, desired_channels: Channels) ?[*]u8;
 
 pub fn load_from_memory(buffer: []const u8, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) ![*]u8 {
     std.debug.assert(buffer.len <= std.math.maxInt(c_int));
-
     return stbi_load_from_memory(
         buffer.ptr,
         @intCast(c_int, buffer.len),
         width,
         height,
-        @ptrCast(*c_int, channels_in_file),
-        @enumToInt(desired_channels),
+        channels_in_file,
+        desired_channels,
     ) orelse error.STB_ImageFailure;
 }
 
-pub extern fn stbi_load_from_callbacks(clbk: *const stbi_io_callbacks, user: ?*anyopaque, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+pub extern fn stbi_load_from_callbacks(clbk: *const stbi_io_callbacks, user: ?*anyopaque, x: *c_int, y: *c_int, channels_in_file: *Channels, desired_channels: Channels) ?[*]u8;
 
 pub fn load_from_callbacks(callback: *const stbi_io_callbacks, user_data: ?*anyopaque, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) ![*]u8 {
     return stbi_load_from_callbacks(
@@ -105,27 +104,27 @@ pub fn load_from_callbacks(callback: *const stbi_io_callbacks, user_data: ?*anyo
         user_data,
         width,
         height,
-        @ptrCast(*c_int, channels_in_file),
-        @enumToInt(desired_channels),
+        channels_in_file,
+        desired_channels,
     ) orelse error.STB_ImageFailure;
 }
 
 // @Todo: support cDefine configuration somehow...
 // #ifndef STBI_NO_STDIO
-pub extern fn stbi_load(filename: [*:0]const u8, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+pub extern fn stbi_load(filename: [*:0]const u8, x: *c_int, y: *c_int, channels_in_file: *Channels, desired_channels: Channels) ?[*]u8;
 
 pub fn load(filename: [:0]const u8, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) ![*]u8 {
     return stbi_load(
         filename,
         width,
         height,
-        @ptrCast(*c_int, channels_in_file),
-        @enumToInt(desired_channels),
+        channels_in_file,
+        desired_channels,
     ) orelse error.STB_ImageFailure;
 }
 
 /// File pointer is left pointing immediately after image.
-pub extern fn stbi_load_from_file(f: *std.c.FILE, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+pub extern fn stbi_load_from_file(f: *std.c.FILE, x: *c_int, y: *c_int, channels_in_file: *Channels, desired_channels: Channels) ?[*]u8;
 
 /// If you're looking for the `load_from_file()` that takes a `std.c.FILE`, use `stbi_load_from_file()`
 pub fn load_from_file(file: std.fs.File, allocator: std.mem.Allocator, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) ![*]u8 {
@@ -137,7 +136,7 @@ pub fn load_from_file(file: std.fs.File, allocator: std.mem.Allocator, width: *c
 
 // #ifndef STBI_NO_GIF
 /// `channels_in_file` always reports as 4-channel
-pub extern fn stbi_load_gif_from_memory(buffer: [*]const u8, len: c_int, delays: *[*]c_int, x: *c_int, y: *c_int, z: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+pub extern fn stbi_load_gif_from_memory(buffer: [*]const u8, len: c_int, delays: *[*]c_int, x: *c_int, y: *c_int, z: *c_int, channels_in_file: *Channels, desired_channels: Channels) ?[*]u8;
 /// `channels_in_file` always reports as 4-channel
 // pub fn load_gif_from_memory(buffer: []const u8, delays: **c_int, x: [*c]c_int, y: [*c]c_int, z: [*c]c_int, comp: [*c]c_int, req_comp: c_int) [*c]u8;
 // #endif
