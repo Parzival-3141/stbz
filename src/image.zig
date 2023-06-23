@@ -45,6 +45,13 @@ pub const Image = struct {
         img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
         return img;
     }
+
+    pub fn load_from_file(file: std.fs.File, allocator: std.mem.Allocator, desired_channels: Channels) !Image {
+        var img: Image = undefined;
+        img.data = try root.load_from_file(file, allocator, &img.width, &img.height, &img.channels_in_input, desired_channels);
+        img.channels_in_data = if (desired_channels == .default) img.channels_in_input else desired_channels;
+        return img;
+    }
 };
 
 pub const stbi_io_callbacks = extern struct {
@@ -103,6 +110,7 @@ pub fn load_from_callbacks(callback: *const stbi_io_callbacks, user_data: ?*anyo
     ) orelse error.STB_ImageFailure;
 }
 
+// @Todo: support cDefine configuration somehow...
 // #ifndef STBI_NO_STDIO
 pub extern fn stbi_load(filename: [*:0]const u8, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
 
@@ -117,21 +125,25 @@ pub fn load(filename: [:0]const u8, width: *c_int, height: *c_int, channels_in_f
 }
 
 /// File pointer is left pointing immediately after image.
-pub fn load_from_file(file: *std.c.FILE, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) [*]u8 {
-    _ = desired_channels;
-    _ = channels_in_file;
-    _ = height;
-    _ = width;
-    _ = file;
+pub extern fn stbi_load_from_file(f: *std.c.FILE, x: *c_int, y: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+
+/// If you're looking for the `load_from_file()` that takes a `std.c.FILE`, use `stbi_load_from_file()`
+pub fn load_from_file(file: std.fs.File, allocator: std.mem.Allocator, width: *c_int, height: *c_int, channels_in_file: *Channels, desired_channels: Channels) ![*]u8 {
+    const contents = try file.readToEndAlloc(allocator, std.math.maxInt(c_int));
+    defer allocator.free(contents);
+    return try load_from_memory(contents, width, height, channels_in_file, desired_channels);
 }
 // #endif
 
 // #ifndef STBI_NO_GIF
-// /// (*comp always reports as 4-channel)
-// pub fn load_gif_from_memory(buffer: []const u8, delays: **c_int, x: [*c]c_int, y: [*c]c_int, z: [*c]c_int, comp: [*c]c_int, req_comp: c_int) [*c]stbi_uc;
+/// `channels_in_file` always reports as 4-channel
+pub extern fn stbi_load_gif_from_memory(buffer: [*]const u8, len: c_int, delays: *[*]c_int, x: *c_int, y: *c_int, z: *c_int, channels_in_file: *c_int, desired_channels: c_int) ?[*]u8;
+/// `channels_in_file` always reports as 4-channel
+// pub fn load_gif_from_memory(buffer: []const u8, delays: **c_int, x: [*c]c_int, y: [*c]c_int, z: [*c]c_int, comp: [*c]c_int, req_comp: c_int) [*c]u8;
 // #endif
 
 // #ifdef STBI_WINDOWS_UTF8
+pub extern fn stbi_convert_wchar_to_utf8(buffer: [*]u8, buffer_len: usize, input: [*:0]const u16) c_int;
 // STBIDEF int stbi_convert_wchar_to_utf8(char *buffer, size_t bufferlen, const wchar_t* input);
 // #endif
 
@@ -264,7 +276,6 @@ test "load_from_callbacks" {
 
         var img = try Image.load_from_callbacks(&callback, &stream, .rgb);
         defer img.free();
-
         try run_img_test(img);
     }
 }
@@ -288,11 +299,33 @@ test "load" {
     }
 }
 
+// !Warning! this test will fail if the cwd isn't the project root!
+test "load_from_file" {
+    const file = try std.fs.cwd().openFile("src/test.png", .{});
+    defer file.close();
+
+    {
+        var w: c_int = undefined;
+        var h: c_int = undefined;
+        var channels: Channels = undefined;
+        const result = try load_from_file(file, std.testing.allocator, &w, &h, &channels, .rgb);
+        defer stbi_image_free(result);
+
+        try run_test(w, h, channels);
+    }
+
+    try file.seekTo(0);
+
+    {
+        var img = try Image.load_from_file(file, std.testing.allocator, .rgb);
+        defer img.free();
+        try run_img_test(img);
+    }
+}
+
 fn run_img_test(img: Image) !void {
-    try std.testing.expect(img.width == 402);
-    try std.testing.expect(img.height == 573);
+    try run_test(img.width, img.height, img.channels_in_input);
     try std.testing.expectEqual(Channels.rgb, img.channels_in_data);
-    try std.testing.expectEqual(Channels.rgb_alpha, img.channels_in_input);
 }
 
 fn run_test(w: c_int, h: c_int, channels: Channels) !void {

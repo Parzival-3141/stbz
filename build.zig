@@ -1,6 +1,7 @@
 const std = @import("std");
 const Build = std.Build;
 
+/// Shouldn't be called from user code
 pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -39,7 +40,7 @@ pub fn module(b: *Build) *Build.Module {
 pub fn link(b: *Build, step: *Build.Step.Compile) void {
     const lib = build_library(b, step.optimize, step.target);
     step.linkLibrary(lib);
-    add_includes(step);
+    step.addIncludePath(stbPath("/include/"));
     step.linkLibC();
 }
 
@@ -50,15 +51,11 @@ fn build_library(b: *Build, optimize: std.builtin.OptimizeMode, target: std.zig.
         .optimize = optimize,
     });
 
-    add_includes(lib);
+    lib.addIncludePath(stbPath("/include/"));
     lib.addCSourceFile(stbPath("/src/c/stb_image.c"), &[_][]const u8{"-std=c99"});
     lib.linkLibC();
 
     return lib;
-}
-
-fn add_includes(step: *Build.Step.Compile) void {
-    step.addIncludePath(stbPath("/include/"));
 }
 
 fn stbPath(comptime suffix: []const u8) []const u8 {
