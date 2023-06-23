@@ -5,9 +5,6 @@ pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // const lib = build_library(b, optimize, target);
-    // b.installArtifact(lib);
-
     const tests = b.addTest(Build.TestOptions{
         .root_source_file = .{ .path = stbPath("/src/main.zig") },
         .target = target,
