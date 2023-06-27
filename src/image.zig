@@ -138,13 +138,23 @@ pub fn load_from_file(file: std.fs.File, allocator: std.mem.Allocator, width: *c
 /// `channels_in_file` always reports as 4-channel
 pub extern fn stbi_load_gif_from_memory(buffer: [*]const u8, len: c_int, delays: *[*]c_int, x: *c_int, y: *c_int, z: *c_int, channels_in_file: *Channels, desired_channels: Channels) ?[*]u8;
 /// `channels_in_file` always reports as 4-channel
-// pub fn load_gif_from_memory(buffer: []const u8, delays: **c_int, x: [*c]c_int, y: [*c]c_int, z: [*c]c_int, comp: [*c]c_int, req_comp: c_int) [*c]u8;
+// pub fn load_gif_from_memory(buffer: []const u8, delays: *[*]c_int, x: *c_int, y: *c_int, z: *c_int, channels_in_file: *Channels, desired_channels: Channels) ![*]u8 {}
 // #endif
 
 // #ifdef STBI_WINDOWS_UTF8
+/// convert Windows wchar_t filenames to utf8.
 pub extern fn stbi_convert_wchar_to_utf8(buffer: [*]u8, buffer_len: usize, input: [*:0]const u16) c_int;
-// STBIDEF int stbi_convert_wchar_to_utf8(char *buffer, size_t bufferlen, const wchar_t* input);
+pub fn convert_wchar_to_utf8(buffer: []u8, input: [*:0]const u16) c_int {
+    return stbi_convert_wchar_to_utf8(buffer.ptr, buffer.len, input);
+}
 // #endif
+
+extern fn stbi_set_flip_vertically_on_load(flag_true_if_should_flip: c_int) void;
+
+/// Global setting. Flips images vertically, so the first pixel in the output array is the bottom left
+pub fn flip_vertically_on_load(should_flip: bool) void {
+    stbi_set_flip_vertically_on_load(@boolToInt(should_flip));
+}
 
 test "load_from_memory" {
     const test_image = @embedFile("test.png");
@@ -320,6 +330,15 @@ test "load_from_file" {
         defer img.free();
         try run_img_test(img);
     }
+}
+
+test "flip_vertically" {
+    flip_vertically_on_load(true);
+
+    var img = try Image.load_from_memory(@embedFile("test.png"), .rgb);
+    defer img.free();
+
+    try run_img_test(img);
 }
 
 fn run_img_test(img: Image) !void {
