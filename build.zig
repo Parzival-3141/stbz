@@ -6,16 +6,21 @@ pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const tests = b.addTest(Build.TestOptions{
-        .root_source_file = .{ .path = stbPath("/src/main.zig") },
+    // Creates a step for unit testing. This only builds the test executable
+    // but does not run it.
+    const tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
 
     link(b, tests);
-    b.installArtifact(tests);
 
     const run_tests = b.addRunArtifact(tests);
+
+    // Similar to creating the run step earlier, this exposes a `test` step to
+    // the `zig build --help` menu, providing a way for the user to request
+    // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_tests.step);
 }
@@ -40,7 +45,7 @@ pub fn module(b: *Build) *Build.Module {
 pub fn link(b: *Build, step: *Build.Step.Compile) void {
     const lib = build_library(b, step.optimize, step.target);
     step.linkLibrary(lib);
-    step.addIncludePath(stbPath("/include/"));
+    step.addIncludePath(Build.LazyPath.relative("include/"));
     step.linkLibC();
 }
 
@@ -51,8 +56,11 @@ fn build_library(b: *Build, optimize: std.builtin.OptimizeMode, target: std.zig.
         .optimize = optimize,
     });
 
-    lib.addIncludePath(stbPath("/include/"));
-    lib.addCSourceFile(stbPath("/src/c/stb_image.c"), &[_][]const u8{"-std=c99"});
+    lib.addIncludePath(Build.LazyPath.relative("include/"));
+    lib.addCSourceFile(.{
+        .file = Build.LazyPath.relative("src/c/stb_image.c"),
+        .flags = &.{"-std=c99"},
+    });
     lib.linkLibC();
 
     return lib;

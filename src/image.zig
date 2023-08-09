@@ -21,7 +21,7 @@ pub const Image = struct {
     channels_in_input: Channels,
 
     pub fn free(self: *Image) void {
-        stbi_image_free(@ptrCast(*anyopaque, self.data));
+        stbi_image_free(@as(*anyopaque, @ptrCast(self.data)));
         self.data = undefined;
     }
 
@@ -88,7 +88,7 @@ pub fn load_from_memory(buffer: []const u8, width: *c_int, height: *c_int, chann
     std.debug.assert(buffer.len <= std.math.maxInt(c_int));
     return stbi_load_from_memory(
         buffer.ptr,
-        @intCast(c_int, buffer.len),
+        @as(c_int, @intCast(buffer.len)),
         width,
         height,
         channels_in_file,
@@ -153,7 +153,7 @@ extern fn stbi_set_flip_vertically_on_load(flag_true_if_should_flip: c_int) void
 
 /// Global setting. Flips images vertically, so the first pixel in the output array is the bottom left
 pub fn flip_vertically_on_load(should_flip: bool) void {
-    stbi_set_flip_vertically_on_load(@boolToInt(should_flip));
+    stbi_set_flip_vertically_on_load(@intFromBool(should_flip));
 }
 
 test "load_from_memory" {
@@ -184,12 +184,12 @@ test "load_from_callbacks" {
             const self = opaque_to_self(data);
 
             const bytes_left = self.data.len - self.index;
-            const bytes_read = @min(@intCast(usize, count), bytes_left);
+            const bytes_read = @min(@as(usize, @intCast(count)), bytes_left);
 
             for (out, self.data[self.index .. self.index + bytes_read]) |*d, s| d.* = s;
             self.index += bytes_read;
 
-            return @intCast(c_int, bytes_read);
+            return @as(c_int, @intCast(bytes_read));
         }
 
         pub fn skip(data: ?*anyopaque, count: c_int) callconv(.C) void {
@@ -206,12 +206,12 @@ test "load_from_callbacks" {
 
         pub fn eof(data: ?*anyopaque) callconv(.C) c_int {
             const self = opaque_to_self(data);
-            return @boolToInt(self.index >= self.data.len);
+            return @intFromBool(self.index >= self.data.len);
         }
 
         // @Todo: this kinda sucks. Maybe have a typed wrapper for the io callbacks?
         fn opaque_to_self(data: ?*anyopaque) *@This() {
-            return @ptrCast(*@This(), @alignCast(@alignOf(*@This()), data));
+            return @ptrCast(@alignCast(data));
         }
     };
 
